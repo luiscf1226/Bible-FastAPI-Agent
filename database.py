@@ -1,0 +1,1 @@
+# Database not required for MVP. Placeholder file. 
