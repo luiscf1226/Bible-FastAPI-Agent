@@ -1,29 +1,23 @@
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Request, Response, Depends
+from fastapi import APIRouter, HTTPException, Request, Response
 from dtos.bible_verse import BibleVerseResponse
 from services.bible_verse import BibleVerseService
-from core.dependencies import create_rate_limit_dependency
 
 router = APIRouter(
     prefix="/verses",
     tags=["verses"],
     responses={
         400: {"description": "Bad Request"},
-        429: {"description": "Too Many Requests"},
         500: {"description": "Internal Server Error"}
     }
 )
-
-# Create endpoint-specific rate limiter
-check_verse_rate_limit = create_rate_limit_dependency("bible_verse_explain")
 
 @router.post("/explain", response_model=BibleVerseResponse)
 async def explain_verses(
     request: Request,
     response: Response,
     verses: List[str],
-    verse_texts: Optional[List[str]] = None,
-    _: None = Depends(check_verse_rate_limit)
+    verse_texts: Optional[List[str]] = None
 ) -> BibleVerseResponse:
     """
     Get a unified explanation for a list of Bible verses.
@@ -38,7 +32,7 @@ async def explain_verses(
         BibleVerseResponse: Contains the explanation and processed verses
         
     Raises:
-        HTTPException: If there's an error processing the request or rate limit exceeded
+        HTTPException: If there's an error processing the request
     """
     try:
         service = BibleVerseService()

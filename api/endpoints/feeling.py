@@ -1,20 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from dtos.feeling_conversation import FeelingMessage, FeelingResponse, FeelingConversation
 from controllers.feeling_controller import FeelingController
-from core.dependencies import create_rate_limit_dependency
 from typing import Optional
 import uuid
 
 router = APIRouter(
     responses={
-        404: {"description": "Not found"},
-        429: {"description": "Too Many Requests"}
+        404: {"description": "Not found"}
     }
 )
-
-# Create endpoint-specific rate limiters
-check_feeling_process_rate_limit = create_rate_limit_dependency("feeling_process")
-check_feeling_get_rate_limit = create_rate_limit_dependency("feeling_get")
 
 def get_controller() -> FeelingController:
     return FeelingController()
@@ -24,8 +18,7 @@ async def process_feeling(
     request: Request,
     response: Response,
     message: FeelingMessage,
-    controller: FeelingController = Depends(get_controller),
-    _: None = Depends(check_feeling_process_rate_limit)
+    controller: FeelingController = Depends(get_controller)
 ):
     """
     Process a feeling message and generate a response.
@@ -54,8 +47,7 @@ async def get_conversation(
     request: Request,
     response: Response,
     conversation_id: str,
-    controller: FeelingController = Depends(get_controller),
-    _: None = Depends(check_feeling_get_rate_limit)
+    controller: FeelingController = Depends(get_controller)
 ):
     """
     Get a conversation by its ID.

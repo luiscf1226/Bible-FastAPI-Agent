@@ -9,19 +9,15 @@ from dtos.bible_character import (
     ChatRequestDTO,
     ChatResponseDTO
 )
-from core.dependencies import get_llm_client, create_rate_limit_dependency
+from core.dependencies import get_llm_client
 
 router = APIRouter(
     prefix="/bible/characters",
     tags=["bible-characters"],
     responses={
-        404: {"description": "Not found"},
-        429: {"description": "Too Many Requests"}
+        404: {"description": "Not found"}
     },
 )
-
-# Create endpoint-specific rate limiter
-check_character_rate_limit = create_rate_limit_dependency("bible_character_chat")
 
 async def get_bible_character_service() -> BibleCharacterService:
     """Get or create BibleCharacterService instance."""
@@ -34,8 +30,7 @@ async def chat_with_character(
     request: Request,
     response: Response,
     chat_request: ChatRequestDTO,
-    service: BibleCharacterService = Depends(get_bible_character_service),
-    _: None = Depends(check_character_rate_limit)
+    service: BibleCharacterService = Depends(get_bible_character_service)
 ) -> ChatResponseDTO:
     """
     Chat with a biblical character.
