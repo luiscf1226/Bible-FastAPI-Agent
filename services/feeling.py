@@ -29,26 +29,37 @@ class FeelingService(BaseService):
         Feeling: {feeling}
         Context: {text}
         
-        Please provide:
-        1. A Bible verse that addresses this feeling
-        2. The verse should be in Spanish
-        3. Include the reference
-        4. Keep it concise and relevant
+        Please provide a complete response with:
+        1. A Bible verse that directly addresses this feeling
+        2. The verse must be in Spanish
+        3. Include the complete reference (Book, Chapter, and Verse)
+        4. Keep it concise but ensure it's a complete verse
+        5. If possible, include a brief explanation of why this verse is relevant
         
-        Format: [Book] [Chapter]:[Verse] - [Verse text in Spanish]"""
+        Format: [Book] [Chapter]:[Verse] - [Complete verse text in Spanish]
+        Explanation: [Brief explanation of relevance]"""
 
     def _get_devotional_prompt(self, feeling: str, text: str, verse: str) -> str:
-        return f"""Based on the following feeling, context, and Bible verse, provide a short devotional message in Spanish:
+        return f"""Based on the following feeling, context, and Bible verse, provide a complete devotional message in Spanish:
         Feeling: {feeling}
         Context: {text}
         Bible Verse: {verse}
         
-        Please provide:
-        1. A short devotional message (1 paragraph max)
-        2. The message should be in Spanish
-        3. It should be encouraging and relevant to the feeling
-        4. Include practical application
-        5. Keep it personal and relatable"""
+        Please provide a complete response with:
+        1. A well-structured devotional message (2-3 paragraphs)
+        2. The message must be in Spanish
+        3. Include:
+           - An encouraging opening
+           - Connection to the Bible verse
+           - Practical application
+           - A hopeful conclusion
+        4. Make it personal and relatable
+        5. Ensure the response is complete and meaningful
+        
+        Format:
+        [Opening paragraph]
+        [Main message connecting verse to feeling]
+        [Practical application and conclusion]"""
 
     def _get_ai_response(self, prompt: str, retry_count: int = 3) -> str:
         for attempt in range(retry_count):
@@ -57,14 +68,29 @@ class FeelingService(BaseService):
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": "You are a helpful assistant that provides Bible verses and devotionals in Spanish."},
+                        {"role": "system", "content": "You are a helpful assistant that provides Bible verses and devotionals in Spanish. Always provide complete responses."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.7,
-                    max_tokens=150
+                    max_tokens=2000,
+                    presence_penalty=0.6,
+                    frequency_penalty=0.3,
+                    top_p=0.9
                 )
                 result = response.choices[0].message.content.strip()
-                logger.info("Successfully received response from OpenAI API")
+                
+                if not result or len(result) < 50:
+                    logger.warning(f"Incomplete response received: {result}")
+                    if attempt < retry_count - 1:
+                        continue
+                    return "Lo siento, no pude generar una respuesta completa. Por favor, intenta de nuevo."
+                
+                if result.endswith("...") or result.endswith("..") or result.endswith(".") == False:
+                    logger.warning(f"Response appears incomplete: {result}")
+                    if attempt < retry_count - 1:
+                        continue
+                
+                logger.info("Successfully received complete response from OpenAI API")
                 return result
             except Exception as e:
                 logger.error(f"Error during OpenAI API call: {str(e)}")
@@ -72,7 +98,70 @@ class FeelingService(BaseService):
                     continue
                 return "Error al conectar con el servicio. Por favor, verifica tu conexión e intenta de nuevo."
 
-    def process_feeling(self, conversation_id: str, feeling: str, text: str) -> FeelingResponse:
+    def _generate_motivational_svg(self, verse: str, feeling: str) -> str:
+        """
+        Generate a motivational SVG based on the verse and feeling.
+        
+        Args:
+            verse (str): The Bible verse
+            feeling (str): The user's feeling
+            
+        Returns:
+            str: SVG string with motivational design
+        """
+        # Extract key words for the design
+        words = verse.split()[:5]  # Use first 5 words for design
+        
+        # Create a more complete and responsive SVG
+        svg = f'''<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+            <defs>
+                <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#4a90e2;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#2c3e50;stop-opacity:1" />
+                </linearGradient>
+                <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            
+            <!-- Background with rounded corners -->
+            <rect width="400" height="300" fill="url(#grad1)" rx="20" ry="20"/>
+            
+            <!-- Decorative elements -->
+            <circle cx="50" cy="50" r="30" fill="white" fill-opacity="0.1"/>
+            <circle cx="350" cy="250" r="40" fill="white" fill-opacity="0.1"/>
+            
+            <!-- Main content -->
+            <g filter="url(#shadow)">
+                <!-- Feeling text -->
+                <text x="50%" y="30%" text-anchor="middle" fill="white" font-family="Arial" font-size="24" font-weight="bold">
+                    {feeling.upper()}
+                </text>
+                
+                <!-- Verse preview -->
+                <text x="50%" y="50%" text-anchor="middle" fill="white" font-family="Arial" font-size="16" font-style="italic">
+                    {words[0]} {words[1]} {words[2]}...
+                </text>
+                
+                <!-- Decorative wave -->
+                <path d="M 50,200 Q 200,230 350,200" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+                
+                <!-- Additional decorative elements -->
+                <path d="M 100,220 Q 150,210 200,220" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <path d="M 200,220 Q 250,230 300,220" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+            </g>
+            
+            <!-- Responsive scaling -->
+            <style>
+                @media (max-width: 400px) {{
+                    svg {{ width: 100%; height: auto; }}
+                }}
+            </style>
+        </svg>'''
+        
+        return svg
+
+    def process_feeling(self, conversation_id: str, feeling: str, text: str, include_svg: bool = False) -> FeelingResponse:
         try:
             if conversation_id not in self.conversations:
                 self.conversations[conversation_id] = FeelingConversation(messages=[])
@@ -82,18 +171,25 @@ class FeelingService(BaseService):
             
             logger.info(f"Processing message for feeling: {feeling}")
             
-            # Get verse using AI
+            # Get verse using AI with retry logic
             verse_prompt = self._get_verse_prompt(feeling, text)
             verse = self._get_ai_response(verse_prompt)
             
-            # Get devotional using AI
+            # Get devotional using AI with retry logic
             devotional_prompt = self._get_devotional_prompt(feeling, text, verse)
             devotional = self._get_ai_response(devotional_prompt)
             
-            response = FeelingResponse(verse=verse, devotional=devotional)
+            # Always generate SVG for consistency
+            svg = self._generate_motivational_svg(verse, feeling)
+            
+            response = FeelingResponse(
+                verse=verse,
+                devotional=devotional,
+                svg=svg if include_svg else None
+            )
             self.conversations[conversation_id].response = response
             
-            logger.info("Successfully processed message and generated response")
+            logger.info("Successfully processed message and generated complete response")
             return response
             
         except Exception as e:

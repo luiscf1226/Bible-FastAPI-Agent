@@ -26,7 +26,7 @@ async def process_feeling(
     Args:
         request (Request): FastAPI request object
         response (Response): FastAPI response object
-        message (FeelingMessage): The feeling message to process
+        message (FeelingMessage): The feeling message to process, including whether to include an SVG
         controller (FeelingController): The feeling controller instance
         
     Returns:
@@ -37,7 +37,8 @@ async def process_feeling(
         return controller.process_feeling(
             conversation_id=conversation_id,
             feeling=message.feeling,
-            text=message.text
+            text=message.text,
+            include_svg=message.include_svg
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
