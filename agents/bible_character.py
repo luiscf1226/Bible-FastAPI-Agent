@@ -15,7 +15,17 @@ from datetime import datetime, timedelta
 from collections import deque
 import uuid
 import asyncio
-from .prompts.bible_character_agent import get_character_prompt, get_response_prompt
+import logging
+from .prompts.bible_character_agent import (
+    get_character_prompt,
+    get_response_prompt,
+    get_system_prompt,
+    CHARACTER_SYSTEM_PROMPT
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class CharacterContext:
@@ -94,11 +104,14 @@ class BibleCharacter:
         self.user_sessions: Dict[str, UserSession] = {}
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
         self._cleanup_task = None
+        self.system_prompt = get_system_prompt()
+        logger.info("BibleCharacter agent initialized successfully")
 
     async def start(self):
         """Start the cleanup task."""
         if self._cleanup_task is None:
             self._cleanup_task = asyncio.create_task(self._cleanup_inactive_sessions())
+            logger.info("Cleanup task started")
 
     async def stop(self):
         """Stop the cleanup task."""
@@ -109,6 +122,7 @@ class BibleCharacter:
             except asyncio.CancelledError:
                 pass
             self._cleanup_task = None
+            logger.info("Cleanup task stopped")
 
     async def _cleanup_inactive_sessions(self):
         """Periodically clean up inactive sessions."""
@@ -124,6 +138,7 @@ class BibleCharacter:
             
             for user_id in inactive_sessions:
                 await self._clear_user_session(user_id)
+                logger.info(f"Cleared inactive session for user: {user_id}")
 
     async def _clear_user_session(self, user_id: str):
         """Clear all session data for a user."""
@@ -137,6 +152,8 @@ class BibleCharacter:
         ]
         for key in memories_to_remove:
             self.conversation_memories.pop(key, None)
+        
+        logger.info(f"Cleared all session data for user: {user_id}")
 
     def _get_or_create_session(self, user_id: str) -> UserSession:
         """Get existing session or create new one."""
@@ -146,6 +163,7 @@ class BibleCharacter:
                 created_at=datetime.utcnow(),
                 last_activity=datetime.utcnow()
             )
+            logger.info(f"Created new session for user: {user_id}")
         else:
             # Update last activity
             self.user_sessions[user_id].last_activity = datetime.utcnow()
@@ -164,13 +182,19 @@ class BibleCharacter:
         """
         # Return cached context if available
         if character_name in self.character_contexts:
+            logger.info(f"Using cached context for character: {character_name}")
             return self.character_contexts[character_name]
 
+        logger.info(f"Extracting new context for character: {character_name}")
+        
         # Chain 1: Extract new context
         prompt = get_character_prompt(character_name)
         response = self.llm_client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.3,
             max_tokens=500
         )
@@ -188,6 +212,7 @@ class BibleCharacter:
         
         # Cache the context
         self.character_contexts[character_name] = context
+        logger.info(f"Successfully extracted and cached context for character: {character_name}")
         return context
 
     async def chat_with_character(
@@ -207,39 +232,48 @@ class BibleCharacter:
         Returns:
             str: Character's response
         """
-        # Update or create user session
-        self._get_or_create_session(user_id)
-        
-        # Get or create conversation memory
-        memory = self.get_or_create_memory(user_id, character_name)
-        
-        # Get character context (cached or newly extracted)
-        context = await self.get_character_context(character_name)
-        
-        # Add user message to memory
-        memory.add_message("user", message)
-        
-        # Chain 2: Generate response using context and conversation history
-        prompt = get_response_prompt(
-            character_name=character_name,
-            character_context=context.to_dict(),
-            conversation_history=memory.get_formatted_history(),
-            user_message=message
-        )
-        
-        response = self.llm_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=300
-        )
-        
-        character_response = response.choices[0].message.content
-        
-        # Add character response to memory
-        memory.add_message("assistant", character_response)
-        
-        return character_response
+        try:
+            # Update or create user session
+            self._get_or_create_session(user_id)
+            
+            # Get or create conversation memory
+            memory = self.get_or_create_memory(user_id, character_name)
+            
+            # Get character context (cached or newly extracted)
+            context = await self.get_character_context(character_name)
+            
+            # Add user message to memory
+            memory.add_message("user", message)
+            
+            # Chain 2: Generate response using context and conversation history
+            prompt = get_response_prompt(
+                character_name=character_name,
+                character_context=context.to_dict(),
+                conversation_history=memory.get_formatted_history(),
+                user_message=message
+            )
+            
+            response = self.llm_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=300
+            )
+            
+            character_response = response.choices[0].message.content
+            
+            # Add character response to memory
+            memory.add_message("assistant", character_response)
+            
+            logger.info(f"Generated response for user {user_id} from character {character_name}")
+            return character_response
+            
+        except Exception as e:
+            logger.error(f"Error in chat_with_character: {str(e)}")
+            raise
 
     def get_or_create_memory(
         self, 
@@ -270,6 +304,7 @@ class BibleCharacter:
         )
         
         self.conversation_memories[memory_key] = memory
+        logger.info(f"Created new conversation memory for user {user_id} with character {character_name}")
         return memory
 
     def _parse_biographical_info(self, response: str) -> Dict[str, str]:
@@ -288,7 +323,8 @@ class BibleCharacter:
                     bio_dict[key] = value.strip()
             
             return bio_dict
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error parsing biographical info: {str(e)}")
             return {
                 "Época y lugar": "Aproximadamente 1040-970 a.C. en Israel",
                 "Antecedentes familiares": "Hijo de Isaí, de la tribu de Judá",
@@ -309,7 +345,8 @@ class BibleCharacter:
                     if event:
                         events.append(event)
             return events
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error parsing key events: {str(e)}")
             return [
                 "Derrotó a Goliat con una honda y una piedra",
                 "Fue ungido como rey por Samuel",
@@ -334,7 +371,8 @@ class BibleCharacter:
                     traits_dict[key] = value.strip()
             
             return traits_dict
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error parsing character traits: {str(e)}")
             return {
                 "Rasgos principales": "Valiente, fiel, talentoso musicalmente",
                 "Fortalezas": "Liderazgo, fe, arrepentimiento",
@@ -358,7 +396,8 @@ class BibleCharacter:
                     legacy_dict[key] = value.strip()
             
             return legacy_dict
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error parsing legacy: {str(e)}")
             return {
                 "Influencia histórica": "Estableció la dinastía davídica y Jerusalén como capital",
                 "Lecciones principales": "Importancia de la fe, arrepentimiento y liderazgo",
@@ -379,17 +418,10 @@ class BibleCharacter:
                     if verse:
                         verses.append(verse)
             return verses
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error parsing Bible verses: {str(e)}")
             return [
                 "1 Samuel 17:45 - La fe de David contra Goliat",
                 "Salmo 51:10 - Su arrepentimiento",
                 "2 Samuel 7:16 - El pacto de Dios con David"
-            ]
-
-    def _format_conversation_history(
-        self, 
-        messages: List[Dict[str, str]]
-    ) -> str:
-        """Format conversation history for the LLM prompt."""
-        # Implementation needed
-        return "" 
+            ] 
