@@ -8,7 +8,7 @@ from fastapi.security.api_key import APIKeyHeader
 from dotenv import load_dotenv
 import os
 import logging
-from api.endpoints import bible_character, bible_verse, feeling
+from api.endpoints import bible_character, bible_verse, feeling, prayer_petition
 from core.dependencies import get_api_key
 
 # Configure logging
@@ -23,7 +23,7 @@ load_dotenv()
 # Create FastAPI app
 app = FastAPI(
     title="Bible API",
-    description="API for Bible verse explanations, character interactions, and feeling-based devotionals",
+    description="API for Bible verse explanations, character interactions, feeling-based devotionals, and prayer petitions",
     version="1.0.0",
     dependencies=[Depends(get_api_key())]  # Add API key validation to all endpoints
 )
@@ -47,6 +47,7 @@ app.add_middleware(
 app.include_router(bible_character.router)
 app.include_router(bible_verse.router)
 app.include_router(feeling.router, prefix="/api/v1", tags=["feelings"])
+app.include_router(prayer_petition.router)
 
 @app.get("/")
 async def root():
