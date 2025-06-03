@@ -326,9 +326,9 @@ class BibleCharacter:
         except Exception as e:
             logger.error(f"Error parsing biographical info: {str(e)}")
             return {
-                "Época y lugar": "Aproximadamente 1040-970 a.C. en Israel",
-                "Antecedentes familiares": "Hijo de Isaí, de la tribu de Judá",
-                "Ocupación principal": "Rey de Israel, poeta, músico"
+                "Época y lugar": "Información no disponible",
+                "Antecedentes familiares": "Información no disponible",
+                "Ocupación principal": "Información no disponible"
             }
 
     def _parse_key_events(self, response: str) -> List[str]:
@@ -347,13 +347,7 @@ class BibleCharacter:
             return events
         except Exception as e:
             logger.error(f"Error parsing key events: {str(e)}")
-            return [
-                "Derrotó a Goliat con una honda y una piedra",
-                "Fue ungido como rey por Samuel",
-                "Estableció Jerusalén como capital de Israel",
-                "Trajo el Arca del Pacto a Jerusalén",
-                "Escribió muchos salmos inspirados"
-            ]
+            return ["Información no disponible"]
 
     def _parse_character_traits(self, response: str) -> Dict[str, str]:
         """Parse character traits from LLM response."""
@@ -374,10 +368,10 @@ class BibleCharacter:
         except Exception as e:
             logger.error(f"Error parsing character traits: {str(e)}")
             return {
-                "Rasgos principales": "Valiente, fiel, talentoso musicalmente",
-                "Fortalezas": "Liderazgo, fe, arrepentimiento",
-                "Debilidades": "Lapsos en juicio moral",
-                "Relación con Dios": "Hombre conforme al corazón de Dios"
+                "Rasgos principales": "Información no disponible",
+                "Fortalezas": "Información no disponible",
+                "Debilidades": "Información no disponible",
+                "Relación con Dios": "Información no disponible"
             }
 
     def _parse_legacy(self, response: str) -> Dict[str, str]:
@@ -399,9 +393,9 @@ class BibleCharacter:
         except Exception as e:
             logger.error(f"Error parsing legacy: {str(e)}")
             return {
-                "Influencia histórica": "Estableció la dinastía davídica y Jerusalén como capital",
-                "Lecciones principales": "Importancia de la fe, arrepentimiento y liderazgo",
-                "Importancia bíblica": "Antepasado del Mesías, autor de salmos"
+                "Influencia histórica": "Información no disponible",
+                "Lecciones principales": "Información no disponible",
+                "Importancia bíblica": "Información no disponible"
             }
 
     def _parse_bible_verses(self, response: str) -> List[str]:
@@ -420,8 +414,4 @@ class BibleCharacter:
             return verses
         except Exception as e:
             logger.error(f"Error parsing Bible verses: {str(e)}")
-            return [
-                "1 Samuel 17:45 - La fe de David contra Goliat",
-                "Salmo 51:10 - Su arrepentimiento",
-                "2 Samuel 7:16 - El pacto de Dios con David"
-            ] 
+            return ["Información no disponible"] 
