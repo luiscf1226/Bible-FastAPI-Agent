@@ -98,22 +98,35 @@ class FeelingService(BaseService):
                     continue
                 return "Error al conectar con el servicio. Por favor, verifica tu conexión e intenta de nuevo."
 
-    def _generate_motivational_svg(self, verse: str, feeling: str) -> str:
+    def _generate_motivational_svg(self, verse: str, feeling: str, text: str = "") -> str:
         """
-        Generate a motivational SVG based on the verse and feeling.
+        Generate a motivational SVG based on the verse, feeling, and context.
         
         Args:
             verse (str): The Bible verse
             feeling (str): The user's feeling
+            text (str): The context text
             
         Returns:
             str: SVG string with motivational design
         """
-        # Extract key words for the design
-        words = verse.split()[:5]  # Use first 5 words for design
+        # Process text for display
+        def truncate_text(text: str, max_length: int = 100) -> str:
+            if len(text) <= max_length:
+                return text
+            return text[:max_length] + "..."
+
+        # Extract verse reference and content
+        verse_parts = verse.split(" - ", 1)
+        verse_ref = verse_parts[0] if len(verse_parts) > 1 else ""
+        verse_content = verse_parts[1] if len(verse_parts) > 1 else verse
         
-        # Create a more complete and responsive SVG
-        svg = f'''<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+        # Process text for display
+        display_text = truncate_text(text)
+        display_verse = truncate_text(verse_content, 150)
+        
+        # Create a more comprehensive SVG
+        svg = f'''<svg width="500" height="400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400">
             <defs>
                 <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" style="stop-color:#4a90e2;stop-opacity:1" />
@@ -122,38 +135,52 @@ class FeelingService(BaseService):
                 <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
                     <feDropShadow dx="2" dy="2" stdDeviation="2" flood-opacity="0.3"/>
                 </filter>
+                <style>
+                    .title {{ font-family: Arial; font-size: 24px; font-weight: bold; fill: white; }}
+                    .subtitle {{ font-family: Arial; font-size: 18px; fill: white; }}
+                    .content {{ font-family: Arial; font-size: 16px; fill: white; }}
+                    .verse {{ font-family: Arial; font-size: 16px; font-style: italic; fill: white; }}
+                    .reference {{ font-family: Arial; font-size: 14px; fill: #a8c6fa; }}
+                </style>
             </defs>
             
             <!-- Background with rounded corners -->
-            <rect width="400" height="300" fill="url(#grad1)" rx="20" ry="20"/>
+            <rect width="500" height="400" fill="url(#grad1)" rx="20" ry="20"/>
             
             <!-- Decorative elements -->
             <circle cx="50" cy="50" r="30" fill="white" fill-opacity="0.1"/>
-            <circle cx="350" cy="250" r="40" fill="white" fill-opacity="0.1"/>
+            <circle cx="450" cy="350" r="40" fill="white" fill-opacity="0.1"/>
             
             <!-- Main content -->
             <g filter="url(#shadow)">
-                <!-- Feeling text -->
-                <text x="50%" y="30%" text-anchor="middle" fill="white" font-family="Arial" font-size="24" font-weight="bold">
+                <!-- Feeling section -->
+                <text x="50%" y="15%" text-anchor="middle" class="title">
                     {feeling.upper()}
                 </text>
                 
-                <!-- Verse preview -->
-                <text x="50%" y="50%" text-anchor="middle" fill="white" font-family="Arial" font-size="16" font-style="italic">
-                    {words[0]} {words[1]} {words[2]}...
+                <!-- Context text -->
+                <text x="50%" y="30%" text-anchor="middle" class="content" width="400">
+                    {display_text}
                 </text>
                 
-                <!-- Decorative wave -->
-                <path d="M 50,200 Q 200,230 350,200" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <!-- Verse reference -->
+                <text x="50%" y="45%" text-anchor="middle" class="reference">
+                    {verse_ref}
+                </text>
                 
-                <!-- Additional decorative elements -->
-                <path d="M 100,220 Q 150,210 200,220" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
-                <path d="M 200,220 Q 250,230 300,220" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <!-- Verse content -->
+                <text x="50%" y="60%" text-anchor="middle" class="verse" width="400">
+                    {display_verse}
+                </text>
+                
+                <!-- Decorative waves -->
+                <path d="M 50,300 Q 250,330 450,300" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M 100,320 Q 250,310 400,320" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
             </g>
             
             <!-- Responsive scaling -->
             <style>
-                @media (max-width: 400px) {{
+                @media (max-width: 500px) {{
                     svg {{ width: 100%; height: auto; }}
                 }}
             </style>
@@ -180,7 +207,7 @@ class FeelingService(BaseService):
             devotional = self._get_ai_response(devotional_prompt)
             
             # Always generate SVG for consistency
-            svg = self._generate_motivational_svg(verse, feeling)
+            svg = self._generate_motivational_svg(verse, feeling, text)
             
             response = FeelingResponse(
                 verse=verse,
